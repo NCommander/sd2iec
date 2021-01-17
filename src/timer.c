@@ -102,6 +102,16 @@ SYSTEM_TICK_HANDLER {
       /* Avoid triggering for the next two seconds */
       lastbuttonchange = ticks;
     }
+
+    if (!(buttonstate & BUTTON_PREV) &&
+        (!BUTTON_NEXT || (buttonstate & BUTTON_NEXT)) &&
+        time_after(ticks, lastbuttonchange + SLEEP_TICKS) &&
+        !key_pressed(KEY_CWD_RESET)) {
+      /* Set ignore flag so the release doesn't trigger KEY_NEXT */
+      active_keys |= KEY_CWD_RESET | IGNORE_KEYS;
+      /* Avoid triggering for the next two seconds */
+      lastbuttonchange = ticks;
+    }
   }
 
   /* send tick to the software RTC emulation */

@@ -575,6 +575,9 @@ void iec_mainloop(void) {
       while (IEC_ATN) {
         if (key_pressed(KEY_NEXT | KEY_PREV | KEY_HOME)) {
           change_disk();
+        } else if (key_pressed(KEY_CWD_RESET)) {
+          reset_cwd();
+          reset_key(KEY_CWD_RESET);
         } else if (key_pressed(KEY_SLEEP)) {
           reset_key(KEY_SLEEP);
           iec_data.bus_state = BUS_SLEEP;

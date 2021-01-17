@@ -357,3 +357,9 @@ void change_init(void) {
   memset(&swaplist,0,sizeof(swaplist));
   globalflags &= (uint8_t)~AUTOSWAP_ACTIVE;
 }
+
+void reset_cwd(void) {
+  do_chdir((unsigned char*)"//");
+  confirm_blink(BLINK_HOME);
+  return;
+}

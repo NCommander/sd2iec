@@ -31,5 +31,6 @@
 void change_init(void);
 void change_disk(void);
 void set_changelist(path_t *path, uint8_t *filename);
+void reset_cwd(void);
 
 #endif

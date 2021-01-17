@@ -34,6 +34,8 @@
 #define KEY_PREV    (1<<1)
 #define KEY_HOME    (1<<2)
 #define KEY_SLEEP   (1<<3)
+#define KEY_CWD_RESET (1<<4)
+
 /* Remote display service request */
 #define KEY_DISPLAY (1<<4)
 
