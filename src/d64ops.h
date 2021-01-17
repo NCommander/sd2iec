@@ -61,4 +61,6 @@ uint8_t d64_bam_commit(void);
 void d64_raw_directory(path_t *path, buffer_t *buf);
 void d64_invalidate(void);
 
+uint16_t sectors_per_track(uint8_t part, uint8_t track);
+
 #endif

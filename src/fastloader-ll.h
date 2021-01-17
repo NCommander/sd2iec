@@ -78,6 +78,9 @@ void parallel_set_dir(parallel_dir_t direction);
 # define parallel_set_dir(x) do {} while (0)
 #endif
 
+uint8_t fserial_out(uint8_t fast_flags, uint8_t value);
+int16_t fserial_in(uint8_t fast_flags);
+
 #endif
 
 #endif

@@ -151,7 +151,39 @@ static int16_t _iec_getc(void) {
     iec_data.iecflags|=EOI_RECVD;                      // EA07
   }
 
-  for (i=0;i<8;i++) {
+  /* Wait for CLOCK high or SRQ low (or ATN active)
+     1571 does not check ATN here, FIXME?          */
+  do {                                             // $8311
+    tmp = IEC_INPUT & (IEC_BIT_ATN | IEC_BIT_CLOCK | IEC_BIT_SRQ);
+  } while (tmp == (IEC_BIT_ATN | IEC_BIT_SRQ));
+  /* if (check_atn()) return -1; */
+
+
+  if (tmp == IEC_BIT_ATN) for (i=0; i<8; i++) { /* fast serial */
+	  /* Note we never check fast serial if ATN active */
+      /* Capture data on rising edge */
+      do {
+        tmp = IEC_INPUT & (IEC_BIT_DATA | IEC_BIT_SRQ);
+      } while (!(tmp & IEC_BIT_SRQ));
+
+	  /* val = (val << 1) | (!!(tmp & IEC_BIT_DATA));
+	  the above was rendred as 5x loop by GCC so used below
+	  ...FIXME ? Move to assembly to avoid compiler dependancy */
+	  val = (val << 1) | ((tmp & IEC_BIT_DATA) > 0);
+	  if (i==7)
+		  break; /* SRQ will not go low again */
+
+	  /* does not work if we call check_atn() and iec_pin()
+	     so do it the direct way */
+	  do {
+		tmp = IEC_INPUT & (IEC_BIT_ATN | IEC_BIT_SRQ);
+	  } while (tmp == (IEC_BIT_ATN | IEC_BIT_SRQ));
+
+	  /* check ATN just to be safe */
+	  if (!(tmp & IEC_BIT_ATN))
+		  return -1;
+  }
+  else for (i=0;i<8;i++) { /* slow serial */
     /* Check for JiffyDOS                                       */
     /*   Source: http://home.arcor.de/jochen.adler/ajnjil-t.htm */
     if (iec_data.bus_state == BUS_ATNACTIVE && i == 7) {
@@ -731,13 +763,41 @@ void iec_mainloop(void) {
       set_atn_irq(1);
 
       if (iec_data.device_state == DEVICE_LISTEN) {
-        if (iec_listen_handler(cmd))
-          break;
+		/* send fast-serial notify  ($816A)
+		FIXME: 1571 will only send this if fast-serial has been detected
+		and that would require a new IEC flag (like JIFFY_ACTIVE)
+		and might require SRQ interrupt (like ATN_IRQ or CLOCK_IRQ)
+		too complex for me to code!
+		For now, always send before entering Listen handler        */
+	    uint8_t tmp, i;
+		ATOMIC_BLOCK( ATOMIC_FORCEON ) {
+           set_data(0); /* active listner, but not ready to receive */
+		   do { /* wait for first byte to start ($8199) */
+               tmp = IEC_INPUT & (IEC_BIT_ATN | IEC_BIT_CLOCK);
+		   } while (tmp == IEC_BIT_ATN);
+		   if (tmp & IEC_BIT_ATN) {
+			   /* toggle SRQ line 8 times to set CIA register in host PC */
+			   for (i=0; i<8; ++i) {
+				   set_srq(0);
+			       _delay_us(4);   // hardware delay, fudged
+				   set_srq(1);
+			       _delay_us(4);   // hardware delay, fudged
+			   }
+		   }
+		}
+		if (tmp & IEC_BIT_ATN) {
+           if (iec_listen_handler(cmd))
+             break;
+		} else { /* found ATN ... FIXME? */
+		   iec_data.device_state = BUS_IDLE;
+		   iec_data.bus_state = BUS_ATNACTIVE;
+		   break;
+		}
       } else if (iec_data.device_state == DEVICE_TALK) {
         set_data(1);
-        delay_us(50);    // Implicit delay, fudged
+        _delay_us(50);   // Implicit delay, fudged
         set_clock(0);
-        delay_us(70);    // Implicit delay, estimated
+        _delay_us(70);   // Implicit delay, estimated
 
         if (iec_talk_handler(cmd))
           break;
@@ -745,7 +805,6 @@ void iec_mainloop(void) {
       }
       iec_data.bus_state = BUS_CLEANUP;
       break;
-
     case BUS_CLEANUP:
       set_atn_irq(1);
       // 836B
